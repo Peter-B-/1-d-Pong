@@ -1,11 +1,11 @@
 #include <FastLED.h>
 
 #define NUM_LEDS 72
-#define BRIGHTNESS 255
+#define BRIGHTNESS 63
 
 const int ledDataPin = 2;
-const int pinA = 3;
-const int pinB = 4;
+const int pinA = 4;
+const int pinB = 3;
 
 CRGB ledsBall[NUM_LEDS];
 CRGB leds[NUM_LEDS];
@@ -13,7 +13,7 @@ CRGB leds[NUM_LEDS];
 enum State {
   WaitForStart,
   AtoB,
-  BtoA,
+  BtoA
 };
 
 State state = WaitForStart;
@@ -33,11 +33,19 @@ void setup() {
 
 unsigned long lastTime = 0;
 
-const int minSpeed = 7;
+const int minSpeed = 10;
 const int maxSpeed = 30;
+const int startSpeed = 20;
 int limit = (NUM_LEDS << 8) - 1;
 long pos = 0;
 int speed = 0;
+int invalidPos = -1;
+
+bool wasPressed = false;
+
+int winA = 0;
+int winB = 0;
+
 
 void loop() {
   auto aPressed = digitalRead(pinA) == LOW;
@@ -46,27 +54,36 @@ void loop() {
   switch (state) {
     case WaitForStart:
       if (aPressed && pos == 0) {
-        speed = 10;
+        speed = startSpeed;
         state = AtoB;
       }
       if (bPressed && pos == limit) {
-        speed = -10;
+        speed = -startSpeed;
         state = BtoA;
       }
       break;
     case AtoB:
-      if (bPressed && pos > limit - (9 << 8)) {
-        auto dif = limit - pos;
-        speed = -GetSpeed(dif);
-        state = BtoA;
-      }
+      if (bPressed && !wasPressed)
+        if (pos > limit - (9 << 8)) {
+          auto dif = limit - pos;
+          speed = -GetSpeed(dif);
+          state = BtoA;
+        } else if (pos > limit / 2) {
+          invalidPos = pos;
+          wasPressed = true;
+        }
+
       break;
     case BtoA:
-      if (aPressed && pos < (9 << 8)) {
-        auto dif = pos;
-        speed = GetSpeed(dif);
-        state = AtoB;
-      }
+      if (aPressed && !wasPressed)
+        if (pos < (9 << 8)) {
+          auto dif = pos;
+          speed = GetSpeed(dif);
+          state = AtoB;
+        } else if (pos < limit / 2) {
+          invalidPos = pos;
+          wasPressed = true;
+        }
       break;
   }
 
@@ -76,16 +93,17 @@ void loop() {
   pos += speed * delta;
 
   if (pos > limit) {
+    winA++;
     Win(0);
   }
   if (pos < 0) {
+    winB++;
     Win(limit);
   }
 
-  fadeToBlackBy(ledsBall, NUM_LEDS, 10);
+  fadeToBlackBy(ledsBall, NUM_LEDS, 20);
 
-  auto ledPos = (pos >> 8) % NUM_LEDS;
-  ledsBall[(ledPos) % NUM_LEDS] = CRGB::Aqua;
+  ledsBall[PosToLed(pos)] = CRGB::Aqua;
 
   SendToLeds();
 
@@ -99,6 +117,11 @@ void SendToLeds() {
     leds[NUM_LEDS - i - 1] = CRGB::DarkGreen;
   }
 
+  if (invalidPos > -1) {
+    auto color = (millis() / 100) % 2 == 0 ? CRGB::HotPink : CRGB::Black;
+    leds[PosToLed(invalidPos)] = color;
+  }
+
   leds[NUM_LEDS / 2] = CRGB::DarkRed;
   leds[(NUM_LEDS / 2) - 1] = CRGB::DarkRed;
 
@@ -109,24 +132,40 @@ void SendToLeds() {
 }
 
 int GetSpeed(int dif) {
-  return map(dif, 9 << 8, 0, 10, 30);
+  if (dif < 256)
+    return maxSpeed * 2;
+  return map(dif, 9 << 8, 0, minSpeed, maxSpeed);
+}
+
+int PosToLed(int pos) {
+  return (pos >> 8) % NUM_LEDS;
 }
 
 void Win(int newPos) {
   FastLED.clear();
-  auto colorA = state == BtoA?CRGB::Red:CRGB::Green;
-  auto colorB = state == BtoA?CRGB::Green:CRGB::Red;
+  auto colorA = state == BtoA ? CRGB::Red : CRGB::Green;
+  auto colorB = state == BtoA ? CRGB::Green : CRGB::Red;
 
-  for (int i = 0; i < NUM_LEDS / 3; i++) {
+  for (int i = 0; i < winA; i++) 
     leds[i] = colorA;
+
+  for (int i = 0; i < winB; i++) 
     leds[NUM_LEDS - i - 1] = colorB;
-  }
+  
 
   FastLED.show();
-  delay(1200);
-
+  for (int i = 0; i < 12; i++) {
+    if (invalidPos > -1) {
+      auto color = (millis() / 100) % 2 == 0 ? CRGB::HotPink : CRGB::Black;
+      leds[PosToLed(invalidPos)] = color;
+      FastLED.show();
+    }
+    delay(100);
+  }
   pos = newPos;
   speed = 0;
   state = WaitForStart;
   lastTime = millis();
+  invalidPos = -1;
+  wasPressed = false;
 }
