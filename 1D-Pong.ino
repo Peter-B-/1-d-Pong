@@ -120,13 +120,13 @@ void SendToLeds() {
     leds[NUM_LEDS - i - 1] = CRGB::DarkGreen;
   }
 
+  leds[NUM_LEDS / 2] = CRGB::DarkRed;
+  leds[(NUM_LEDS / 2) - 1] = CRGB::DarkRed;
+
   if (invalidPos > -1) {
     auto color = (millis() / 100) % 2 == 0 ? CRGB::HotPink : CRGB::Black;
     leds[PosToLed(invalidPos)] = color;
   }
-
-  leds[NUM_LEDS / 2] = CRGB::DarkRed;
-  leds[(NUM_LEDS / 2) - 1] = CRGB::DarkRed;
 
   for (int i = 0; i < NUM_LEDS; i++)
     leds[i] += ledsBall[i];
@@ -149,11 +149,14 @@ void Win(int newPos) {
   auto colorA = state == BtoA ? CRGB::Red : CRGB::Green;
   auto colorB = state == BtoA ? CRGB::Green : CRGB::Red;
 
+  leds[NUM_LEDS / 2 - 1] = CRGB::Gray;
+  leds[NUM_LEDS / 2] = CRGB::Gray;
+
   for (int i = 0; i < winA; i++)
-    leds[i] = colorA;
+    leds[NUM_LEDS / 2 - i - 2] = colorA;
 
   for (int i = 0; i < winB; i++)
-    leds[NUM_LEDS - i - 1] = colorB;
+    leds[NUM_LEDS / 2 + i + 1] = colorB;
 
 
   FastLED.show();
