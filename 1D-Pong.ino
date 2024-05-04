@@ -28,6 +28,8 @@ void setup() {
   FastLED.addLeds<WS2811, ledDataPin, RGB>(leds, NUM_LEDS);
   FastLED.setBrightness(BRIGHTNESS);
 
+
+
   Serial.begin(115200);
 }
 
@@ -36,6 +38,7 @@ unsigned long lastTime = 0;
 const int minSpeed = 10;
 const int maxSpeed = 30;
 const int startSpeed = 20;
+const int winMax = 8;
 int limit = (NUM_LEDS << 8) - 1;
 long pos = 0;
 int speed = 0;
@@ -61,6 +64,7 @@ void loop() {
         speed = -startSpeed;
         state = BtoA;
       }
+      lastTime = millis();
       break;
     case AtoB:
       if (bPressed && !wasPressed)
@@ -90,23 +94,22 @@ void loop() {
   auto time = millis();
 
   auto delta = (int)(time - lastTime);
+
   pos += speed * delta;
 
   if (pos > limit) {
     winA++;
     Win(0);
-  }
-  if (pos < 0) {
+  } else if (pos < 0) {
     winB++;
     Win(limit);
+  } else {
+    fadeToBlackBy(ledsBall, NUM_LEDS, 20);
+
+    ledsBall[PosToLed(pos)] = CRGB::Aqua;
+
+    SendToLeds();
   }
-
-  fadeToBlackBy(ledsBall, NUM_LEDS, 20);
-
-  ledsBall[PosToLed(pos)] = CRGB::Aqua;
-
-  SendToLeds();
-
   lastTime = time;
 }
 
@@ -146,12 +149,12 @@ void Win(int newPos) {
   auto colorA = state == BtoA ? CRGB::Red : CRGB::Green;
   auto colorB = state == BtoA ? CRGB::Green : CRGB::Red;
 
-  for (int i = 0; i < winA; i++) 
+  for (int i = 0; i < winA; i++)
     leds[i] = colorA;
 
-  for (int i = 0; i < winB; i++) 
+  for (int i = 0; i < winB; i++)
     leds[NUM_LEDS - i - 1] = colorB;
-  
+
 
   FastLED.show();
   for (int i = 0; i < 12; i++) {
@@ -162,10 +165,30 @@ void Win(int newPos) {
     }
     delay(100);
   }
+
+  if (winA == winMax || winB == winMax)
+    GameWinAnimation();
+
   pos = newPos;
   speed = 0;
   state = WaitForStart;
   lastTime = millis();
   invalidPos = -1;
   wasPressed = false;
+}
+
+void GameWinAnimation() {
+  bool aWon = (winA == winMax);
+  for (int i = 0; i < 48; i++) {
+    FastLED.clear();
+
+    auto r = i < 24 ? i : 48 - i;
+    for (int j = 0; j < r; j++) {
+      auto idx = aWon ? j : NUM_LEDS - j - 1;
+      leds[idx] = CRGB::Orange;
+    }
+    FastLED.show();
+    delay(40);
+  }
+  winA = winB = 0;
 }
