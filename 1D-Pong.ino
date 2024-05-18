@@ -1,14 +1,18 @@
 #include <FastLED.h>
 
-#define NUM_LEDS 72
-#define BRIGHTNESS 63
+const int numLeds = 72;
 
 const int ledDataPin = 2;
-const int pinA = 4;
-const int pinB = 3;
+const int pinButtonA = 3;
+const int pinButtonB = 5;
+const int pinLedA = 4;
+const int pinLedB = 6;
+const int pinBrightness = 7;
 
-CRGB ledsBall[NUM_LEDS];
-CRGB leds[NUM_LEDS];
+CRGB ledsBall[numLeds];
+CRGB leds[numLeds];
+
+int brightness = 6;
 
 enum State {
   WaitForStart,
@@ -22,24 +26,26 @@ void setup() {
   // sanity check delay - allows reprogramming if accidently blowing power w/leds
   delay(100);
 
-  pinMode(pinA, INPUT_PULLUP);
-  pinMode(pinB, INPUT_PULLUP);
+  pinMode(pinButtonA, INPUT_PULLUP);
+  pinMode(pinButtonB, INPUT_PULLUP);
+  pinMode(pinLedA, OUTPUT);
+  pinMode(pinLedB, OUTPUT);
+  pinMode(pinBrightness, INPUT_PULLUP);
 
-  FastLED.addLeds<WS2811, ledDataPin, RGB>(leds, NUM_LEDS);
-  FastLED.setBrightness(BRIGHTNESS);
-
-
+  FastLED.addLeds<WS2811, ledDataPin, RGB>(leds, numLeds);
+  SetBrightness();
 
   Serial.begin(115200);
 }
 
 unsigned long lastTime = 0;
+unsigned long lastBrightnessTime = 0;
 
 const int minSpeed = 10;
 const int maxSpeed = 30;
 const int startSpeed = 20;
 const int winMax = 8;
-int limit = (NUM_LEDS << 8) - 1;
+int limit = (numLeds << 8) - 1;
 long pos = 0;
 int speed = 0;
 int invalidPos = -1;
@@ -51,8 +57,10 @@ int winB = 0;
 
 
 void loop() {
-  auto aPressed = digitalRead(pinA) == LOW;
-  auto bPressed = digitalRead(pinB) == LOW;
+  CheckBrightness();
+
+  auto aPressed = digitalRead(pinButtonA) == LOW;
+  auto bPressed = digitalRead(pinButtonB) == LOW;
 
   switch (state) {
     case WaitForStart:
@@ -64,7 +72,6 @@ void loop() {
         speed = -startSpeed;
         state = BtoA;
       }
-      lastTime = millis();
       break;
     case AtoB:
       if (bPressed && !wasPressed)
@@ -91,9 +98,13 @@ void loop() {
       break;
   }
 
-  auto time = millis();
+  digitalWrite(pinLedA, pos < limit / 2);
+  digitalWrite(pinLedB, pos > limit / 2);
 
+
+  auto time = millis();
   auto delta = (int)(time - lastTime);
+  lastTime = time;
 
   pos += speed * delta;
 
@@ -104,31 +115,44 @@ void loop() {
     winB++;
     Win(limit);
   } else {
-    fadeToBlackBy(ledsBall, NUM_LEDS, 20);
+    fadeToBlackBy(ledsBall, numLeds, 20);
 
     ledsBall[PosToLed(pos)] = CRGB::Aqua;
 
     SendToLeds();
   }
-  lastTime = time;
+}
+
+void CheckBrightness() {
+  if ((millis() - lastBrightnessTime) > 400 && digitalRead(pinBrightness) == LOW) {
+    brightness++;
+    if (brightness > 8) brightness = 4;
+    SetBrightness();
+
+    lastBrightnessTime = millis();
+  }
+}
+
+void SetBrightness() {
+  FastLED.setBrightness((1 << brightness) - 1);
 }
 
 void SendToLeds() {
   FastLED.clear();
   for (int i = 0; i < 9; i++) {
     leds[i] = CRGB::DarkGreen;
-    leds[NUM_LEDS - i - 1] = CRGB::DarkGreen;
+    leds[numLeds - i - 1] = CRGB::DarkGreen;
   }
 
-  leds[NUM_LEDS / 2] = CRGB::DarkRed;
-  leds[(NUM_LEDS / 2) - 1] = CRGB::DarkRed;
+  leds[numLeds / 2] = CRGB::DarkRed;
+  leds[(numLeds / 2) - 1] = CRGB::DarkRed;
 
   if (invalidPos > -1) {
     auto color = (millis() / 100) % 2 == 0 ? CRGB::HotPink : CRGB::Black;
     leds[PosToLed(invalidPos)] = color;
   }
 
-  for (int i = 0; i < NUM_LEDS; i++)
+  for (int i = 0; i < numLeds; i++)
     leds[i] += ledsBall[i];
 
   FastLED.show();
@@ -141,7 +165,7 @@ int GetSpeed(int dif) {
 }
 
 int PosToLed(int pos) {
-  return (pos >> 8) % NUM_LEDS;
+  return (pos >> 8) % numLeds;
 }
 
 void Win(int newPos) {
@@ -149,14 +173,14 @@ void Win(int newPos) {
   auto colorA = state == BtoA ? CRGB::Red : CRGB::Green;
   auto colorB = state == BtoA ? CRGB::Green : CRGB::Red;
 
-  leds[NUM_LEDS / 2 - 1] = CRGB::Gray;
-  leds[NUM_LEDS / 2] = CRGB::Gray;
+  leds[numLeds / 2 - 1] = CRGB::Gray;
+  leds[numLeds / 2] = CRGB::Gray;
 
   for (int i = 0; i < winA; i++)
-    leds[NUM_LEDS / 2 - i - 2] = colorA;
+    leds[numLeds / 2 - i - 2] = colorA;
 
   for (int i = 0; i < winB; i++)
-    leds[NUM_LEDS / 2 + i + 1] = colorB;
+    leds[numLeds / 2 + i + 1] = colorB;
 
 
   FastLED.show();
@@ -187,7 +211,7 @@ void GameWinAnimation() {
 
     auto r = i < 24 ? i : 48 - i;
     for (int j = 0; j < r; j++) {
-      auto idx = aWon ? j : NUM_LEDS - j - 1;
+      auto idx = aWon ? j : numLeds - j - 1;
       leds[idx] = CRGB::Orange;
     }
     FastLED.show();
