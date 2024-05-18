@@ -170,11 +170,11 @@ int PosToLed(int pos) {
 
 void Win(int newPos) {
   FastLED.clear();
-  auto colorA = state == BtoA ? CRGB::Red : CRGB::Green;
-  auto colorB = state == BtoA ? CRGB::Green : CRGB::Red;
+  auto colorA = state == BtoA ? CRGB::Yellow : CRGB::Green;
+  auto colorB = state == BtoA ? CRGB::Green : CRGB::Yellow;
 
-  leds[numLeds / 2 - 1] = CRGB::Gray;
-  leds[numLeds / 2] = CRGB::Gray;
+  leds[numLeds / 2 - 1] = CRGB::DarkRed;
+  leds[numLeds / 2] = CRGB::DarkRed;
 
   for (int i = 0; i < winA; i++)
     leds[numLeds / 2 - i - 2] = colorA;
@@ -212,7 +212,7 @@ void GameWinAnimation() {
     auto r = i < 24 ? i : 48 - i;
     for (int j = 0; j < r; j++) {
       auto idx = aWon ? j : numLeds - j - 1;
-      leds[idx] = CRGB::Orange;
+      leds[idx] = CRGB::Green;
     }
     FastLED.show();
     delay(40);
