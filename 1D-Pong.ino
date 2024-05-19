@@ -33,13 +33,14 @@ void setup() {
   pinMode(pinBrightness, INPUT_PULLUP);
 
   FastLED.addLeds<WS2811, ledDataPin, RGB>(leds, numLeds);
-  SetBrightness();
+  SetBrightness(brightness);
 
   Serial.begin(115200);
 }
 
 unsigned long lastTime = 0;
 unsigned long lastBrightnessTime = 0;
+unsigned long lastGameEnd = 0;
 
 const int minSpeed = 10;
 const int maxSpeed = 30;
@@ -59,11 +60,23 @@ int winB = 0;
 void loop() {
   CheckBrightness();
 
+  auto time = millis();
+
   auto aPressed = digitalRead(pinButtonA) == LOW;
   auto bPressed = digitalRead(pinButtonB) == LOW;
 
   switch (state) {
     case WaitForStart:
+      if (time - lastGameEnd > 5 * 60 * 1000) {
+        RunScreenSaver();
+        FastLED.clear();
+        FastLED.show();
+        SetBrightness(brightness);
+        delay(200);
+        lastGameEnd = millis();
+        return;
+      }
+
       if (aPressed && pos == 0) {
         speed = startSpeed;
         state = AtoB;
@@ -102,7 +115,6 @@ void loop() {
   digitalWrite(pinLedB, pos > limit / 2);
 
 
-  auto time = millis();
   auto delta = (int)(time - lastTime);
   lastTime = time;
 
@@ -121,13 +133,13 @@ void loop() {
 
     auto ledPos = PosToLed(pos);
     if (isLightSpeed) {
-      ledsBall[ledPos] = CRGB::White ;
+      ledsBall[ledPos] = CRGB::White;
 
       // The ball is moving with light speed. Draw 2 leds, to avoid
       // a one led being skipped.
       ledPos = state == AtoB ? ledPos - 1 : ledPos + 1;
       if (ledPos >= 0 && ledPos < numLeds)
-        ledsBall[ledPos] = CRGB::White ;
+        ledsBall[ledPos] = CRGB::White;
     } else
       ledsBall[ledPos] = CRGB::Aqua;
 
@@ -140,14 +152,14 @@ void CheckBrightness() {
   if ((millis() - lastBrightnessTime) > 400 && digitalRead(pinBrightness) == LOW) {
     brightness++;
     if (brightness > 8) brightness = 4;
-    SetBrightness();
+    SetBrightness(brightness);
 
     lastBrightnessTime = millis();
   }
 }
 
-void SetBrightness() {
-  FastLED.setBrightness((1 << brightness) - 1);
+void SetBrightness(int br) {
+  FastLED.setBrightness((1 << br) - 1);
 }
 
 void SendToLeds() {
@@ -217,6 +229,7 @@ void Win(int newPos) {
   lastTime = millis();
   invalidPos = -1;
   wasPressed = false;
+  lastGameEnd = lastTime;
 
   // Clear ledBall, so that no tail is visible.
   fill_solid(ledsBall, numLeds, CRGB::Black);
@@ -250,4 +263,54 @@ void GameWinAnimation() {
     delay(40);
   }
   winA = winB = 0;
+}
+
+
+void fadeall() {
+  for (int i = 0; i < numLeds; i++) { leds[i].nscale8(250); }
+}
+
+void RunScreenSaver() {
+  digitalWrite(pinLedA, LOW);
+  digitalWrite(pinLedB, LOW);
+
+  SetBrightness(brightness - 1);
+
+  static uint8_t hue = 0;
+
+  while (true) {
+    // First slide the led in one direction
+    for (int i = 0; i < numLeds; i++) {
+      // Set the i'th led to red
+      leds[i] = CHSV(hue++, 255, 255);
+      // Show the leds
+      FastLED.show();
+      // now that we've shown the leds, reset the i'th led to black
+      // leds[i] = CRGB::Black;
+      fadeall();
+      // Wait a little bit before we loop around and do it again
+      delay(20);
+
+      auto aPressed = digitalRead(pinButtonA) == LOW;
+      auto bPressed = digitalRead(pinButtonB) == LOW;
+      if (aPressed || bPressed) return;
+    }
+
+    // Now go in the other direction.
+    for (int i = (numLeds)-1; i >= 0; i--) {
+      // Set the i'th led to red
+      leds[i] = CHSV(hue++, 255, 255);
+      // Show the leds
+      FastLED.show();
+      // now that we've shown the leds, reset the i'th led to black
+      // leds[i] = CRGB::Black;
+      fadeall();
+      // Wait a little bit before we loop around and do it again
+      delay(20);
+
+      auto aPressed = digitalRead(pinButtonA) == LOW;
+      auto bPressed = digitalRead(pinButtonB) == LOW;
+      if (aPressed || bPressed) return;
+    }
+  }
 }
