@@ -67,7 +67,7 @@ void loop() {
 
   switch (state) {
     case WaitForStart:
-      if (time - lastGameEnd > 5 * 60 * 1000) {
+      if (time - lastGameEnd > 60000UL) {
         RunScreenSaver();
         FastLED.clear();
         FastLED.show();
