@@ -117,7 +117,20 @@ void loop() {
   } else {
     fadeToBlackBy(ledsBall, numLeds, 20);
 
-    ledsBall[PosToLed(pos)] = CRGB::Aqua;
+    auto isLightSpeed = abs(speed) > maxSpeed;
+
+    auto ledPos = PosToLed(pos);
+    if (isLightSpeed) {
+      ledsBall[ledPos] = CRGB::White ;
+
+      // The ball is moving with light speed. Draw 2 leds, to avoid
+      // a one led being skipped.
+      ledPos = state == AtoB ? ledPos - 1 : ledPos + 1;
+      if (ledPos >= 0 && ledPos < numLeds)
+        ledsBall[ledPos] = CRGB::White ;
+    } else
+      ledsBall[ledPos] = CRGB::Aqua;
+
 
     SendToLeds();
   }
@@ -173,6 +186,8 @@ void Win(int newPos) {
   auto colorA = state == BtoA ? CRGB::Yellow : CRGB::Green;
   auto colorB = state == BtoA ? CRGB::Green : CRGB::Yellow;
 
+  DrawScore(colorA, colorB);
+
   leds[numLeds / 2 - 1] = CRGB::DarkRed;
   leds[numLeds / 2] = CRGB::DarkRed;
 
@@ -202,12 +217,29 @@ void Win(int newPos) {
   lastTime = millis();
   invalidPos = -1;
   wasPressed = false;
+
+  // Clear ledBall, so that no tail is visible.
+  fill_solid(ledsBall, numLeds, CRGB::Black);
+}
+
+void DrawScore(CRGB colorA, CRGB colorB) {
+
+  leds[numLeds / 2 - 1] = CRGB::DarkRed;
+  leds[numLeds / 2] = CRGB::DarkRed;
+
+  for (int i = 0; i < winA; i++)
+    leds[numLeds / 2 - i - 2] = colorA;
+
+  for (int i = 0; i < winB; i++)
+    leds[numLeds / 2 + i + 1] = colorB;
 }
 
 void GameWinAnimation() {
   bool aWon = (winA == winMax);
   for (int i = 0; i < 48; i++) {
     FastLED.clear();
+
+    DrawScore(CRGB::Yellow, CRGB::Yellow);
 
     auto r = i < 24 ? i : 48 - i;
     for (int j = 0; j < r; j++) {
