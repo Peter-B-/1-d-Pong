@@ -186,7 +186,7 @@ void SendToLeds() {
   leds[(numLeds / 2) - 1] = CRGB::DarkRed;
 
   if (invalidPos > -1) {
-    auto color = (millis() / 100) % 2 == 0 ? CRGB::HotPink : CRGB::Black;
+    auto color = (millis() / 100) % 2 == 0 ? CRGB::White : CRGB::Black;
     leds[PosToLed(invalidPos)] = color;
   }
 
@@ -226,7 +226,7 @@ void Win(int newPos) {
   FastLED.show();
   for (int i = 0; i < 12; i++) {
     if (invalidPos > -1) {
-      auto color = (millis() / 100) % 2 == 0 ? CRGB::HotPink : CRGB::Black;
+      auto color = (millis() / 100) % 2 == 0 ? CRGB::White : CRGB::Black;
       leds[PosToLed(invalidPos)] = color;
       FastLED.show();
     }
