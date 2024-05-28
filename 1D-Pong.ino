@@ -21,6 +21,7 @@ enum State {
 };
 
 State state = WaitForStart;
+bool autoA = false;
 
 void setup() {
   // sanity check delay - allows reprogramming if accidently blowing power w/leds
@@ -36,6 +37,9 @@ void setup() {
   SetBrightness(brightness);
 
   Serial.begin(115200);
+  randomSeed(analogRead(0));
+
+  autoA = digitalRead(pinBrightness) == LOW;
 }
 
 unsigned long lastTime = 0;
@@ -50,6 +54,7 @@ int limit = (numLeds << 8) - 1;
 long pos = 0;
 int speed = 0;
 int invalidPos = -1;
+int autoAPos = -1;
 
 bool wasPressed = false;
 
@@ -77,7 +82,10 @@ void loop() {
         return;
       }
 
-      if (aPressed && pos == 0) {
+      if ((aPressed || 
+          (autoA && time - lastGameEnd > 200UL && time > 1000UL)
+          )
+          && pos == 0) {
         speed = startSpeed;
         state = AtoB;
       }
@@ -87,7 +95,7 @@ void loop() {
       }
       break;
     case AtoB:
-      if (bPressed && !wasPressed)
+      if (bPressed && !wasPressed) {
         if (pos > limit - (9 << 8)) {
           auto dif = limit - pos;
           speed = -GetSpeed(dif);
@@ -96,10 +104,15 @@ void loop() {
           invalidPos = pos;
           wasPressed = true;
         }
-
+        autoAPos = -1;
+      }
       break;
     case BtoA:
-      if (aPressed && !wasPressed)
+      if (autoA && autoAPos == -1)
+        // Init position at which the AI will hit the ball
+        autoAPos = random(-256, 10 << 8);
+
+      if (!wasPressed && (aPressed || (autoA && pos < autoAPos)))
         if (pos < (9 << 8)) {
           auto dif = pos;
           speed = GetSpeed(dif);
@@ -230,6 +243,7 @@ void Win(int newPos) {
   invalidPos = -1;
   wasPressed = false;
   lastGameEnd = lastTime;
+  autoAPos = -1;
 
   // Clear ledBall, so that no tail is visible.
   fill_solid(ledsBall, numLeds, CRGB::Black);
